@@ -180,18 +180,30 @@ server <- function(input, output, session) {
   
   # Render table untuk data yang diunggah
   output$table <- DT::renderDataTable({
-    data_presensi = data_presensi()
-    
-    as.datatable(formattable(data_presensi,
-                             list(
-                               `Masuk Kerja` = color_tile("#d9544d", "lightgreen"),
-                               `Hadir Normal` = color_tile("#d9544d", "lightgreen"),
-                               `Tanpa Keterangan` = color_tile("lightgreen", "#d9544d"),
-                               `Absen Masuk` = color_tile("lightgreen", "#d9544d"),
-                               `Absen Pulang` = color_tile("lightgreen", "#d9544d"),
-                               Telat = color_tile("lightgreen", "#d9544d")
-                             ))
-    )
+    withProgress(message = 'Making plot', value = 0, {
+      data_presensi = data_presensi()
+      
+      incProgress(1/2, detail = paste("Import Data"))
+      
+      # Pause for 0.1 seconds to simulate a long computation.
+      Sys.sleep(0.1)
+      
+      data_presensi = as.datatable(formattable(data_presensi,
+                               list(
+                                 `Masuk Kerja` = color_tile("#d9544d", "lightgreen"),
+                                 `Hadir Normal` = color_tile("#d9544d", "lightgreen"),
+                                 `Tanpa Keterangan` = color_tile("lightgreen", "#d9544d"),
+                                 `Absen Masuk` = color_tile("lightgreen", "#d9544d"),
+                                 `Absen Pulang` = color_tile("lightgreen", "#d9544d"),
+                                 Telat = color_tile("lightgreen", "#d9544d")
+                               ))
+      )
+      incProgress(2/2, detail = paste("Import Data"))
+      
+      # Pause for 0.1 seconds to simulate a long computation.
+      Sys.sleep(0.1)
+    })
+    data_presensi
   })
   
   output$download_data <- renderUI({
