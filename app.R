@@ -6,11 +6,12 @@ library(DT)
 library(dplyr)
 library(tidyr)
 library(formattable)
-
+library(waiter)
 # Define UI
 
 ui <- page_sidebar(
   title = "Cek Presensi",
+  waiter::autoWaiter(),
   sidebar = sidebar(
     width = "20%",
     fillable = T,
