@@ -13,15 +13,15 @@ Terdapat setidaknya 4 program sebagai berikut:
 
 Terdapat isu mengecek lokasi radius titik presensi dengan titik kantor OPD KAB. Sugesti menghitung jarak dengan fungsi dari library (sf) \`st_distance\`.
 
-![Hasil Keterangan Titik Presensi Terhadap Polygon](img/cek luar.png)
+![Hasil Keterangan Titik Presensi Terhadap Polygon](./img/cek luar.png)
 
-2.  `cek peta.R` untuk mengecek titik dengan polygon kecamatan tertentu
+2.  "cek peta.R" untuk mengecek titik dengan polygon kecamatan tertentu
 
     ![Cek Peta](img/cek peta.png)
 
-3.  `cek ket presensi.R` untuk mengecek keterangan absen pegawai
+3.  "cek ket presensi.R" untuk mengecek keterangan absen pegawai
 
-    [![](img/keterangan presensi.png)](Output Cek Presensi)
+![Output Cek Presensi](./img/keterangan presensi.png)
 
 4.  `presensi-online.ipynb` untuk melakukan scraping titik lokasi presensi PKB
 
