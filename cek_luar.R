@@ -3,10 +3,9 @@ library(leaflet)
 library(dplyr)
 library(openxlsx)
 
-batas_kec_sulbar <- st_read("~/Documents/projects/cek-presensi/data/batas-administrasi-indonesia-master/2020/Batas Kecamatan SHP/Batas Kecamatan.shp")
+batas_kec_sulbar <- readRDS("data/batas_kec_sulbar.rds")
 batas_kec_sulbar <- batas_kec_sulbar %>%
-  filter(Provinsi == "SULAWESI BARAT")
-
+  mutate(Kab_Kota = if_else(Kab_Kota == "MAMUJU UTARA", "PASANGKAYU", Kab_Kota))
 presensi <- read.xlsx("data/agustus_presensi.xlsx")
 presensi$lat1 <- as.numeric(presensi$lat1)
 presensi$lat2 <- as.numeric(presensi$lat2)

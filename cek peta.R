@@ -2,10 +2,10 @@ library(leaflet)
 
 batas_kec <- batas_kec_sulbar %>%
   filter(Provinsi == "SULAWESI BARAT", 
-         Kab_Kota == "MAMUJU",
-         Kecamatan == "MAMUJU")
+         Kab_Kota == "PASANGKAYU",
+         Kecamatan == "DAPURANG")
 
-leaflet(batas_kec_sulbar) %>%
+leaflet(batas_kec) %>%
   addTiles() %>%  # Add default OpenStreetMap map tiles
-  addMarkers(lng=118.8914, lat=-2.669750, popup="The birthplace of R") %>%
+  addMarkers(lng=119.3356, lat=-1.744539, popup="The birthplace of R") %>%
   addPolygons()
