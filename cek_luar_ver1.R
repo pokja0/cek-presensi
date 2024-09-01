@@ -82,7 +82,12 @@ for (i in 1:nrow(presensi)) {
   awal_opd_kb <- cek_radius(presensi_lon1, presensi_lat1, opd_long, opd_lat)
   akhir_opd_kb <- cek_radius(presensi_lon2, presensi_lat2, opd_long, opd_lat)
   # Mengecek hasilnya
-  if ((lengths(hasil_awal) > 0 && lengths(hasil_akhir) > 0) || (awal_opd_kb == F && akhir_opd_kb == F)) {
+  if ((lengths(hasil_awal) > 0 && lengths(hasil_akhir) > 0) || 
+      (lengths(hasil_awal) > 0 && awal_opd_kb == F) ||
+      (lengths(hasil_awal) > 0 && akhir_opd_kb == F) ||
+      (lengths(hasil_akhir) > 0 && awal_opd_kb == F ) ||
+      (lengths(hasil_akhir) > 0 && akhir_opd_kb == F ) ||
+      (awal_opd_kb == F && akhir_opd_kb == F)) {
     print("Titik berada di dalam poligon kecamatan.")
     presensi$presensi_cek[i] = "Presensi Sesuai"
   #} else if (lengths(hasil_awal) > 0 & lengths(hasil_akhir) <= 0) {

@@ -10,7 +10,31 @@ library(waiter)
 library(leaflet)
 library(sf)
 library(bsicons)
+library(shinymanager)
 # Define UI
+
+# define some basic credentials (on data.frame)
+credentials <- data.frame(
+  user = c("shiny", "admin.sulbar"), # mandatory
+  password = c("azerty", "666803"), # mandatory
+  start = c("2019-04-15"), # optinal (all others)
+  expire = c(NA, "2024-12-31"),
+  admin = c(FALSE, TRUE),
+  comment = "Simple and secure authentification mechanism 
+  for single ‘Shiny’ applications.",
+  stringsAsFactors = FALSE
+)
+
+# Change language
+shinymanager::set_labels(
+  language = "en",
+  "Please authenticate" = "Selamat Datang",
+  "Username:" = "Masukkan Username:",
+  "Password:" = "Masukkan password:",
+  "Logout" = "Keluar",
+  "Login" = "Masuk"
+)
+
 
 ui <- page_navbar(
   title = "Presensi PKB",
@@ -72,8 +96,26 @@ ui <- page_navbar(
   )
 )
 
+ui <- secure_app(
+  ui,
+  tags_top = 
+    tags$div(
+      tags$img(
+        src = "https://bkkbnsulbar.id/wp-content/uploads/2022/12/cropped-logobkkbnsulbar.png", width = 100
+      )
+    )
+)
+
 # Define server logic
 server <- function(input, output, session) {
+  # call the server part
+  # check_credentials returns a function to authenticate users
+  res_auth <- secure_server(check_credentials = check_credentials(credentials), keep_token = TRUE)
+  
+  output$auth_output <- renderPrint({
+    reactiveValuesToList(res_auth)
+  })
+  
   # Render UI for date range input based on selected month
   output$date_range_input <- renderUI({
     req(input$month)
