@@ -18,8 +18,8 @@ data_map <- readxl::read_excel("hasil/cek_presensi_agustus_full.xlsx")
 
 # define some basic credentials (on data.frame)
 credentials <- data.frame(
-  user = c("shiny", "admin.sulbar"), # mandatory
-  password = c("azerty", "666803"), # mandatory
+  user = c("1", "admin.sulbar"), # mandatory
+  password = c("1", "666803"), # mandatory
   start = c("2019-04-15"), # optinal (all others)
   expire = c(NA, "2024-12-31"),
   admin = c(FALSE, TRUE),
@@ -67,7 +67,7 @@ ui <- page_navbar(
         ),
         uiOutput("download_data")
       ),
-      card(
+      card(min_height = "700px",
         DT::dataTableOutput("table")
       )
     )
@@ -293,6 +293,13 @@ server <- function(input, output, session) {
   output$table <- DT::renderDataTable({
     withProgress(message = 'Sabar ki', value = 0, {
       data_presensi = data_presensi()
+      data_presensi$`Masuk Kerja` = as.numeric(data_presensi$`Masuk Kerja`)
+      data_presensi$`Hadir Normal` = as.numeric(data_presensi$`Hadir Normal`)
+      data_presensi$`Tanpa Keterangan` = as.numeric(data_presensi$`Tanpa Keterangan`)
+      data_presensi$`Absen Masuk` = as.numeric(data_presensi$`Absen Masuk`)
+      data_presensi$`Absen Pulang` = as.numeric(data_presensi$`Absen Pulang`)
+      data_presensi$Telat = as.numeric(data_presensi$Telat)
+      data_presensi$`Menit Lambat` = as.numeric(data_presensi$`Menit Lambat`)
       
       incProgress(1/2, detail = paste("Import Data"))
       
@@ -321,8 +328,10 @@ server <- function(input, output, session) {
                                  `Absen Masuk` = color_tile("lightgreen", "#d9544d"),
                                  `Absen Pulang` = color_tile("lightgreen", "#d9544d"),
                                  Telat = color_tile("lightgreen", "#d9544d"),
-                                 `Menit Lambat` = color_bar2("#d9544d")
-                               ))
+                                 `Menit Lambat` = color_tile("yellow", "#d9544d")
+                               )),
+                               filter = 'top'
+                               
       )
       incProgress(2/2, detail = paste("Import Data"))
       
