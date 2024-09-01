@@ -12,6 +12,7 @@ library(sf)
 library(bsicons)
 library(shinymanager)
 library(stringr)
+library(tidygeocoder)
 # Define UI
 data_map <- readxl::read_excel("hasil/cek_presensi_agustus_full.xlsx")
 
@@ -37,9 +38,10 @@ shinymanager::set_labels(
   "Login" = "Masuk"
 )
 
-autoWaiter()
+
 ui <- page_navbar(
-  title = "Presensi PKB",
+  title = "Presensi PKB",fillable = F,
+
   nav_panel(
     title = "Rekap Mandiri", 
     layout_sidebar(
@@ -71,11 +73,11 @@ ui <- page_navbar(
     )
   ),
   nav_panel(
-    title = "Titik Presensi", 
+    title = "Titik Presensi",
       navset_card_pill(
         nav_panel(
           "Rincian",
-          DT::dataTableOutput("table_map")
+          DT::dataTableOutput("table_map", height = "500px")
         ),
         nav_panel(
           "Peta",
@@ -392,16 +394,6 @@ server <- function(input, output, session) {
     updateSelectInput(session, "pilih_tanggal", choices = date_data$Tanggal)
   })
   
-  # output$input_date_map <- renderUI({
-  #   date_data = data_map %>%
-  #     filter(Kecamatan == input$pilih_kecamatan,
-  #            Nama == input$pilih_pkb) 
-  #   
-  #   date_data = date_data$Tanggal
-  #   
-  #   selectInput("pilih_tanggal", "Pilih Tanggal", choices = date_data)
-  # })
-  
   output$table_map <- DT::renderDataTable({
     data_map = data_map %>%
       select(-X1)
@@ -438,17 +430,21 @@ server <- function(input, output, session) {
   })
 
   output$leaflet_map <- renderLeaflet({
+    withProgress(message = 'Kudu Sabar', value = 0, {
+    incProgress(1/4, detail = paste("Import Data"))
     data_map = data_map %>%
       filter(Kecamatan == input$pilih_kecamatan,
              Nama == input$pilih_pkb,
              Tanggal == input$pilih_tanggal)
+
     
     data_map$lat1 <- as.numeric(data_map$lat1)
     data_map$lat2 <- as.numeric(data_map$lat2)
     data_map$lon1 <- as.numeric(data_map$lon1)
     data_map$lon2 <- as.numeric(data_map$lon2)
-    
+
     ###
+    incProgress(2/4, detail = paste("Membuat Peta"))
     kantor_opd <- data.frame(
       Kab = c("PASANGKAYU", "MAMUJU TENGAH", "MAMUJU", 
               "MAJENE", "POLEWALI MANDAR", "MAMASA"),
@@ -459,12 +455,12 @@ server <- function(input, output, session) {
       Long = as.numeric(c(119.3759606, 119.2865281, 118.8911821, 
                           118.9849558, 119.319912, 119.3700759))
     )
-    
+
     # Fungsi untuk membuat leaflet map
     create_leaflet_map <- function(presensi_data, index) {
       # Memeriksa apakah index valid
       if (index > nrow(presensi_data) || index < 1) {
-        stop("Index out of bounds.")
+        stop("Tunggu yaa..")
       }
       
       # Menyaring data berdasarkan index
@@ -475,20 +471,46 @@ server <- function(input, output, session) {
       
       batas_kec = batas_kec_sulbar %>%
         filter(Kecamatan == selected_row$Kecamatan)
+      
+      
+      # Gunakan reverse_geocode untuk mengambil alamat
+      hasil = tibble(
+        latitude = c(selected_row$lat1, selected_row$lat2),
+        longitude = c(selected_row$lon1, selected_row$lon2)
+      ) %>%
+        reverse_geocode(
+          lat = latitude,
+          long = longitude,
+          method = "osm",
+          address = address_found,
+          full_results = TRUE
+        )
+      
       # Membuat leaflet map
       leaflet(batas_kec) %>%
         addTiles() %>%
-        addPolygons(
-          label = ~Kecamatan
-        ) %>%
-        addMarkers(lng = selected_row$lon1, lat = selected_row$lat1, popup = "Awal", label = "Awal") %>%
-        addMarkers(lng = selected_row$lon2, lat = selected_row$lat2, popup = "Akhir", label = "Akhir") %>%
-        addCircles(lng = titik_kantor_opd$Long, lat = titik_kantor_opd$Lat, radius = 1000, color = "red", fillColor = "red", fillOpacity = 0.2) %>%
-        setView(lng = (selected_row$lon1 + selected_row$lon2) / 2, lat = (selected_row$lat1 + selected_row$lat2) / 2, zoom = 12)
+        addPolygons() %>%
+        addMarkers(lng = selected_row$lon1, lat = selected_row$lat1, 
+                   popup = paste(hasil$address_found[1], hasil$road[1], hasil$village[1], 
+                                 hasil$municipality[1], sep = " | "), 
+                   label = "Awal") %>%
+        addMarkers(lng = selected_row$lon2, lat = selected_row$lat2, 
+                   popup = paste(hasil$address_found[2], hasil$road[1],
+                                 hasil$village[2], hasil$municipality[2], sep = " | "),
+                   label = "Akhir") %>%
+        addCircles(lng = titik_kantor_opd$Long, lat = titik_kantor_opd$Lat, radius = 1000, 
+                   color = "red", fillColor = "red", fillOpacity = 0.2) %>%
+        setView(lng = (selected_row$lon1 + selected_row$lon2) / 2, 
+                lat = (selected_row$lat1 + selected_row$lat2) / 2, zoom = 12)
     }
-    
+
     # Contoh pemanggilan fungsi
-    create_leaflet_map(data_map, 1)
+    incProgress(3/4, detail = paste("Sedikit lagi"))
+    peta_presensi = create_leaflet_map(data_map, 1)
+    incProgress(4/4, detail = paste("Selesai"))
+    
+    peta_presensi
+    })
   })
   
   observeEvent(input$mymap_marker_click, { 
