@@ -6,7 +6,8 @@ library(units)
 
 batas_kec_sulbar <- readRDS("data/batas_kec_sulbar.rds")
 batas_kec_sulbar <- batas_kec_sulbar %>%
-  mutate(Kab_Kota = if_else(Kab_Kota == "MAMUJU UTARA", "PASANGKAYU", Kab_Kota))
+  mutate(Kab_Kota = if_else(Kab_Kota == "MAMUJU UTARA", "PASANGKAYU", Kab_Kota),
+         Kecamatan = if_else(Kecamatan == "SIMBORO DAN KEPULAUAN", "SIMBORO", Kecamatan))
 presensi <- read.xlsx("data/agustus_presensi_full.xlsx")
 presensi$lat1 <- as.numeric(presensi$lat1)
 presensi$lat2 <- as.numeric(presensi$lat2)

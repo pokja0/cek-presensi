@@ -36,7 +36,7 @@ shinymanager::set_labels(
   "Login" = "Masuk"
 )
 
-
+autoWaiter()
 ui <- page_navbar(
   title = "Presensi PKB",
   nav_panel(
@@ -88,15 +88,10 @@ ui <- page_navbar(
                           choices = month.name[8], 
                           selected = "August"),
               selectInput("pilih_tanggal", "Pilih Tanggal", choices = NULL),
-              actionButton(
-                inputId = "cari_map",
-                label = "Cari",
-                style = "jelly", 
-                color = "primary", size = "sm"
-              ),
             ), #sidebar
             uiOutput("vb_ket_presensi"),
-            leafletOutput("leaflet_map")
+            leafletOutput("leaflet_map"),
+            fluidRow(verbatimTextOutput("map_marker_click"))
           ) #layout sidebar
         )
       )
@@ -138,27 +133,6 @@ server <- function(input, output, session) {
     # Update dateRangeInput dengan tanggal baru
     updateDateRangeInput(session, "daterange", start = start_date, end = end_date)
   })
-  
-  # output$date_range_input <- renderUI({
-  #   req(input$month)
-  #   
-  #   # Tentukan bulan dalam format numerik
-  #   month_num <- match(input$month, month.name)
-  #   
-  #   # Set start and end dates based on selected month
-  #   start_date <- as.Date(sprintf("2024-%02d-01", month_num))
-  #   end_date <- as.Date(sprintf("2024-%02d-%02d", month_num, 
-  #                               days_in_month(start_date)))
-  #   
-  #   # Render date range input
-  #   dateRangeInput("daterange", "Pilih Rentang Tanggal:",
-  #                  start = start_date,
-  #                  end = end_date,
-  #                  min = start_date,
-  #                  max = end_date,
-  #                  format = "dd-mm-yyyy",
-  #                  separator = " - ")
-  # })
   
   output$teks_dates <- renderPrint({
     print(input$daterange[1])
@@ -250,6 +224,34 @@ server <- function(input, output, session) {
     tanggal_cols <- colnames(data_tes_wide)[-(1:2)]
     tanggal_cols_sorted <- sort(as.Date(tanggal_cols, format = "%d-%m-%Y"))
     
+    ### Menhitung telat
+    # Mengubah tanggal menjadi nama kolom dengan nilai dari kolom yang digabung
+    data_tes_wide_telat <- data_tes_wide
+    
+    data_tes_wide_telat <- data_tes_wide_telat %>%
+      gather("Tanggal", "Presensi", 3:ncol(data_tes_wide_telat)) %>%
+      mutate(
+        Waktu_Masuk = str_extract(Presensi, "^\\d{2}:\\d{2}") %>% 
+          ifelse(. %in% c("NA", "TK") | is.na(.), "12:00", .),
+        Menit_Lambat = ifelse(
+          is.na(Waktu_Masuk), 
+          270, 
+          pmax(
+            as.numeric(difftime(
+              as.POSIXct(Waktu_Masuk, format = "%H:%M"), 
+              as.POSIXct("07:30", format = "%H:%M"), 
+              units = "mins"
+            )), 
+            0
+          )
+        )
+      ) %>%
+      select(NIP, Menit_Lambat) %>%
+      group_by(NIP) %>%
+      summarise(Menit_Lambat = sum(Menit_Lambat))
+    
+    ##
+    
     data_tes_wide <- data_tes_wide %>%
       mutate(
         Hari.Kerja = ncol(data_tes_wide) - 2
@@ -270,14 +272,18 @@ server <- function(input, output, session) {
     
     pkb_kec = read.xlsx("data/pkb_kec.xlsx")
     data_tes_wide <- inner_join(pkb_kec, data_tes_wide, by = "NIP")
+    data_tes_wide <- inner_join(data_tes_wide_telat, data_tes_wide, by = "NIP")
     
     data_tes_wide <- data_tes_wide %>%
-      select(-c(1,5))
+      select(-c(3,6)) %>%
+      select(Kabupaten:Nama.y, NIP, Hari.Kerja:Telat, Menit_Lambat, everything())
     
     data_tes_wide = data_tes_wide %>%
       rename(Nama = Nama.y, `Hari Kerja` = Hari.Kerja, `Masuk Kerja` = Masuk.Kerja,
              `Hadir Normal` = Hadir.Normal, `Tanpa Keterangan` = Tanpa.Keterangan,
-             `Absen Masuk` = Absen.Masuk, `Absen Pulang` = Absen.Pulang)
+             `Absen Masuk` = Absen.Masuk, `Absen Pulang` = Absen.Pulang, `Menit Lambat` = Menit_Lambat)
+    
+    
   })
   
   # Render table untuk data yang diunggah
@@ -290,6 +296,20 @@ server <- function(input, output, session) {
       # Pause for 0.1 seconds to simulate a long computation.
       Sys.sleep(0.1)
       
+      bg = function(start, end, color, ...) {
+        paste("linear-gradient(90deg,transparent ",percent(start),",",
+              color, percent(start), ",", color, percent(end),
+              ", transparent", percent(end),")")
+      } 
+      
+      color_bar2 =  function (color = "lightgray", fun = "proportion", ...) 
+      {
+        fun <- match.fun(fun)
+        formatter("span", style = function(x) style(display = "inline-block",
+                                                    `unicode-bidi` = "plaintext", 
+                                                    "background" = bg(1-fun(as.numeric(x), ...), 1, color), "width"="100%" ))
+      }
+      
       data_presensi = as.datatable(formattable(data_presensi,
                                list(
                                  `Masuk Kerja` = color_tile("#d9544d", "lightgreen"),
@@ -297,7 +317,8 @@ server <- function(input, output, session) {
                                  `Tanpa Keterangan` = color_tile("lightgreen", "#d9544d"),
                                  `Absen Masuk` = color_tile("lightgreen", "#d9544d"),
                                  `Absen Pulang` = color_tile("lightgreen", "#d9544d"),
-                                 Telat = color_tile("lightgreen", "#d9544d")
+                                 Telat = color_tile("lightgreen", "#d9544d"),
+                                 `Menit Lambat` = color_bar2("#d9544d")
                                ))
       )
       incProgress(2/2, detail = paste("Import Data"))
@@ -351,7 +372,8 @@ server <- function(input, output, session) {
   data_map <- readxl::read_excel("hasil/cek_presensi_agustus_full.xlsx")
   batas_kec_sulbar <- readRDS("data/batas_kec_sulbar.rds")
   batas_kec_sulbar <- batas_kec_sulbar %>%
-    mutate(Kab_Kota = if_else(Kab_Kota == "MAMUJU UTARA", "PASANGKAYU", Kab_Kota))
+    mutate(Kab_Kota = if_else(Kab_Kota == "MAMUJU UTARA", "PASANGKAYU", Kab_Kota),
+           Kecamatan = if_else(Kecamatan == "SIMBORO DAN KEPULAUAN", "SIMBORO", Kecamatan))
   
   observeEvent(input$pilih_kecamatan, {
     # Menentukan pilihan baru untuk selectInput kedua berdasarkan kategori yang dipilih
@@ -392,10 +414,14 @@ server <- function(input, output, session) {
   })
   
   output$vb_ket_presensi <- renderUI({
+    Kecamatan1 = input$pilih_kecamatan
+    Nama1 = input$pilih_pkb
+    Tanggal1 = input$pilih_tanggal
+    
     vb_data = data_map %>%
-      filter(Kecamatan == input$pilih_kecamatan,
-             Nama == input$pilih_pkb,
-             Tanggal == input$pilih_tanggal) 
+      filter(Kecamatan == Kecamatan1,
+             Nama == Nama1,
+             Tanggal == Tanggal1) 
     
     if(vb_data$presensi_cek == "Presensi Sesuai"){
       icons_vb = "check-circle"
@@ -463,6 +489,12 @@ server <- function(input, output, session) {
     # Contoh pemanggilan fungsi
     create_leaflet_map(data_map, 1)
   })
+  
+  observeEvent(input$mymap_marker_click, { 
+    p <- input$mymap_marker_click  # typo was on this line
+    print(p)
+  })
+  
 }
 
 # Run the application 

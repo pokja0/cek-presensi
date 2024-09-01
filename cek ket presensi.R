@@ -1,5 +1,6 @@
 library(tidyverse)
 library(openxlsx)
+library(stringr)
 presensi_pkb_juli <- read.xlsx("data/agustus_presensiadmin.sulbar.xlsx", startRow = 5)
 
 data_tes <- presensi_pkb_juli %>%
@@ -42,7 +43,7 @@ start_date <- "01-08-2024"
 start_date <- format(start_date, format = "%d-%m-%Y")
 
 # Konversi string tanggal ke objek Date
-end_date <- "16-08-2024"
+end_date <- "31-08-2024"
 # Mengubah format objek Date menjadi string dengan format "dd-mm-yyyy"
 end_date <- format(end_date, format = "%d-%m-%Y")
 
@@ -84,6 +85,34 @@ data_tes_wide <- data_tes_wide[, !(names(data_tes_wide) %in% weekend_cols)]
 tanggal_cols <- colnames(data_tes_wide)[-(1:2)]
 tanggal_cols_sorted <- sort(as.Date(tanggal_cols, format = "%d-%m-%Y"))
 
+### Menhitung telat
+# Mengubah tanggal menjadi nama kolom dengan nilai dari kolom yang digabung
+data_tes_wide_telat <- data_tes_wide
+
+data_tes_wide_telat <- data_tes_wide_telat %>%
+  gather("Tanggal", "Presensi", 3:ncol(data_tes_wide_telat)) %>%
+  mutate(
+    Waktu_Masuk = str_extract(Presensi, "^\\d{2}:\\d{2}") %>% 
+      ifelse(. %in% c("NA", "TK") | is.na(.), "12:00", .),
+    Menit_Lambat = ifelse(
+      is.na(Waktu_Masuk), 
+      270, 
+      pmax(
+        as.numeric(difftime(
+          as.POSIXct(Waktu_Masuk, format = "%H:%M"), 
+          as.POSIXct("07:30", format = "%H:%M"), 
+          units = "mins"
+        )), 
+        0
+      )
+    )
+  ) %>%
+  select(NIP, Menit_Lambat) %>%
+  group_by(NIP) %>%
+  summarise(Menit_Lambat = sum(Menit_Lambat))
+
+##
+
 data_tes_wide <- data_tes_wide %>%
   mutate(
     Hari.Kerja = ncol(data_tes_wide) - 2
@@ -104,11 +133,13 @@ data_tes_wide <- data_tes_wide %>%
 
 pkb_kec = read.xlsx("data/pkb_kec.xlsx")
 data_tes_wide <- inner_join(pkb_kec, data_tes_wide, by = "NIP")
+data_tes_wide <- inner_join(data_tes_wide_telat, data_tes_wide, by = "NIP")
 
 data_tes_wide <- data_tes_wide %>%
-  select(-c(1,5))
+  select(-c(3,6)) %>%
+  select(Kabupaten:Nama.y, NIP, Hari.Kerja:Telat, Menit_Lambat, everything())
 
 data_tes_wide = data_tes_wide %>%
   rename(Nama = Nama.y, `Hari Kerja` = Hari.Kerja, `Masuk Kerja` = Masuk.Kerja,
          `Hadir Normal` = Hadir.Normal, `Tanpa Keterangan` = Tanpa.Keterangan,
-         `Absen Masuk` = Absen.Masuk, `Absen Pulang` = Absen.Pulang)
+         `Absen Masuk` = Absen.Masuk, `Absen Pulang` = Absen.Pulang, `Menit Lambar` = Menit_Lambat)
