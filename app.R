@@ -12,6 +12,7 @@ library(sf)
 library(bsicons)
 library(shinymanager)
 # Define UI
+data_map <- readxl::read_excel("hasil/cek_presensi_agustus_full.xlsx")
 
 # define some basic credentials (on data.frame)
 credentials <- data.frame(
@@ -48,7 +49,13 @@ ui <- page_navbar(
         selectInput("month", "Pilih Bulan", 
                     choices = month.name, 
                     selected = "August"),
-        uiOutput("date_range_input"),
+        dateRangeInput("daterange", "Pilih Rentang Tanggal:",
+                       start = NULL,
+                       end = NULL,
+                       min = NULL,
+                       max = NULL,
+                       format = "dd-mm-yyyy",
+                       separator = " - "),
         actionButton(
           inputId = "cari",
           label = "Cari",
@@ -75,12 +82,12 @@ ui <- page_navbar(
             sidebar = sidebar(
               width = "20%",
               fillable = T,
-              uiOutput("select_kecamatan"),
-              uiOutput("select_pkb"),
+              selectInput("pilih_kecamatan", "Pilih Kecamatan", choices = unique(data_map$Kecamatan)),
+              selectInput("pilih_pkb", "Pilih PKB/PLKB", choices = NULL),
               selectInput("month_map", "Pilih Bulan", 
                           choices = month.name[8], 
                           selected = "August"),
-              uiOutput("input_date_map"),
+              selectInput("pilih_tanggal", "Pilih Tanggal", choices = NULL),
               actionButton(
                 inputId = "cari_map",
                 label = "Cari",
@@ -117,7 +124,7 @@ server <- function(input, output, session) {
   })
   
   # Render UI for date range input based on selected month
-  output$date_range_input <- renderUI({
+  observe({
     req(input$month)
     
     # Tentukan bulan dalam format numerik
@@ -128,15 +135,30 @@ server <- function(input, output, session) {
     end_date <- as.Date(sprintf("2024-%02d-%02d", month_num, 
                                 days_in_month(start_date)))
     
-    # Render date range input
-    dateRangeInput("daterange", "Pilih Rentang Tanggal:",
-                   start = start_date,
-                   end = end_date,
-                   min = start_date,
-                   max = end_date,
-                   format = "dd-mm-yyyy",
-                   separator = " - ")
+    # Update dateRangeInput dengan tanggal baru
+    updateDateRangeInput(session, "daterange", start = start_date, end = end_date)
   })
+  
+  # output$date_range_input <- renderUI({
+  #   req(input$month)
+  #   
+  #   # Tentukan bulan dalam format numerik
+  #   month_num <- match(input$month, month.name)
+  #   
+  #   # Set start and end dates based on selected month
+  #   start_date <- as.Date(sprintf("2024-%02d-01", month_num))
+  #   end_date <- as.Date(sprintf("2024-%02d-%02d", month_num, 
+  #                               days_in_month(start_date)))
+  #   
+  #   # Render date range input
+  #   dateRangeInput("daterange", "Pilih Rentang Tanggal:",
+  #                  start = start_date,
+  #                  end = end_date,
+  #                  min = start_date,
+  #                  max = end_date,
+  #                  format = "dd-mm-yyyy",
+  #                  separator = " - ")
+  # })
   
   output$teks_dates <- renderPrint({
     print(input$daterange[1])
@@ -331,28 +353,31 @@ server <- function(input, output, session) {
   batas_kec_sulbar <- batas_kec_sulbar %>%
     mutate(Kab_Kota = if_else(Kab_Kota == "MAMUJU UTARA", "PASANGKAYU", Kab_Kota))
   
-  output$select_kecamatan <- renderUI({
-    selectInput("pilih_kecamatan", "Pilih Kecamatan", choices = unique(data_map$Kecamatan))
-  })
-  
-  output$select_pkb <- renderUI({
+  observeEvent(input$pilih_kecamatan, {
+    # Menentukan pilihan baru untuk selectInput kedua berdasarkan kategori yang dipilih
     pkb_name = data_map %>%
       filter(Kecamatan == input$pilih_kecamatan)
-    
-    pkb_name = unique(pkb_name$Nama)
-    
-    selectInput("pilih_pkb", "Pilih PKB/PLKB", choices = pkb_name)
+    updateSelectInput(session, "pilih_pkb", choices = unique(pkb_name$Nama))
   })
-  
-  output$input_date_map <- renderUI({
+
+  observeEvent(input$pilih_pkb, {
+    # Menentukan pilihan baru untuk selectInput kedua berdasarkan kategori yang dipilih
     date_data = data_map %>%
       filter(Kecamatan == input$pilih_kecamatan,
              Nama == input$pilih_pkb) 
     
-    date_data = date_data$Tanggal
-    
-    selectInput("pilih_tanggal", "Pilih Tanggal", choices = date_data)
+    updateSelectInput(session, "pilih_tanggal", choices = date_data$Tanggal)
   })
+  
+  # output$input_date_map <- renderUI({
+  #   date_data = data_map %>%
+  #     filter(Kecamatan == input$pilih_kecamatan,
+  #            Nama == input$pilih_pkb) 
+  #   
+  #   date_data = date_data$Tanggal
+  #   
+  #   selectInput("pilih_tanggal", "Pilih Tanggal", choices = date_data)
+  # })
   
   output$table_map <- DT::renderDataTable({
     data_map = data_map %>%
