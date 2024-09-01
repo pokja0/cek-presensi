@@ -11,6 +11,7 @@ library(leaflet)
 library(sf)
 library(bsicons)
 library(shinymanager)
+library(stringr)
 # Define UI
 data_map <- readxl::read_excel("hasil/cek_presensi_agustus_full.xlsx")
 
@@ -288,7 +289,7 @@ server <- function(input, output, session) {
   
   # Render table untuk data yang diunggah
   output$table <- DT::renderDataTable({
-    withProgress(message = 'Making plot', value = 0, {
+    withProgress(message = 'Kudu Sabar', value = 0, {
       data_presensi = data_presensi()
       
       incProgress(1/2, detail = paste("Import Data"))
