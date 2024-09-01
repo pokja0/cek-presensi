@@ -7,30 +7,68 @@ library(dplyr)
 library(tidyr)
 library(formattable)
 library(waiter)
+library(leaflet)
+library(sf)
+library(bsicons)
 # Define UI
 
-ui <- page_sidebar(
-  title = "Cek Presensi",
-  waiter::autoWaiter(),
-  sidebar = sidebar(
-    width = "20%",
-    fillable = T,
-    fileInput("file1", "Upload Data"),
-    selectInput("month", "Pilih Bulan", 
-                choices = month.name, 
-                selected = "July"),
-    uiOutput("date_range_input"),
-    actionButton(
-      inputId = "cari",
-      label = "Cari",
-      style = "jelly", 
-      color = "primary", size = "sm"
-    ),
-    uiOutput("download_data")
+ui <- page_navbar(
+  title = "Presensi PKB",
+  nav_panel(
+    title = "Rekap Mandiri", 
+    layout_sidebar(
+      sidebar = sidebar(
+        width = "20%",
+        fillable = T,
+        fileInput("file1", "Upload Data"),
+        selectInput("month", "Pilih Bulan", 
+                    choices = month.name, 
+                    selected = "August"),
+        uiOutput("date_range_input"),
+        actionButton(
+          inputId = "cari",
+          label = "Cari",
+          style = "jelly", 
+          color = "primary", size = "sm"
+        ),
+        uiOutput("download_data")
+      ),
+      card(
+        DT::dataTableOutput("table")
+      )
+    )
   ),
-  card(
-    
-    DT::dataTableOutput("table")
+  nav_panel(
+    title = "Titik Presensi", 
+      navset_card_pill(
+        nav_panel(
+          "Rincian",
+          DT::dataTableOutput("table_map")
+        ),
+        nav_panel(
+          "Peta",
+          layout_sidebar(
+            sidebar = sidebar(
+              width = "20%",
+              fillable = T,
+              uiOutput("select_kecamatan"),
+              uiOutput("select_pkb"),
+              selectInput("month_map", "Pilih Bulan", 
+                          choices = month.name[8], 
+                          selected = "August"),
+              uiOutput("input_date_map"),
+              actionButton(
+                inputId = "cari_map",
+                label = "Cari",
+                style = "jelly", 
+                color = "primary", size = "sm"
+              ),
+            ), #sidebar
+            uiOutput("vb_ket_presensi"),
+            leafletOutput("leaflet_map")
+          ) #layout sidebar
+        )
+      )
   )
 )
 
@@ -220,7 +258,6 @@ server <- function(input, output, session) {
     }
   )
   
-  
   observeEvent(input$cari, {
     req(input$file1)
     selected_month <- input$month
@@ -244,7 +281,121 @@ server <- function(input, output, session) {
       ))
     }
   })
+  
+  #Map
+  
+  data_map <- readxl::read_excel("hasil/cek_presensi_agustus_full.xlsx")
+  batas_kec_sulbar <- readRDS("data/batas_kec_sulbar.rds")
+  batas_kec_sulbar <- batas_kec_sulbar %>%
+    mutate(Kab_Kota = if_else(Kab_Kota == "MAMUJU UTARA", "PASANGKAYU", Kab_Kota))
+  
+  output$select_kecamatan <- renderUI({
+    selectInput("pilih_kecamatan", "Pilih Kecamatan", choices = unique(data_map$Kecamatan))
+  })
+  
+  output$select_pkb <- renderUI({
+    pkb_name = data_map %>%
+      filter(Kecamatan == input$pilih_kecamatan)
+    
+    pkb_name = unique(pkb_name$Nama)
+    
+    selectInput("pilih_pkb", "Pilih PKB/PLKB", choices = pkb_name)
+  })
+  
+  output$input_date_map <- renderUI({
+    date_data = data_map %>%
+      filter(Kecamatan == input$pilih_kecamatan,
+             Nama == input$pilih_pkb) 
+    
+    date_data = date_data$Tanggal
+    
+    selectInput("pilih_tanggal", "Pilih Tanggal", choices = date_data)
+  })
+  
+  output$table_map <- DT::renderDataTable({
+    data_map = data_map %>%
+      select(-X1)
+    
+    DT::datatable(
+      data_map, 
+      filter = 'top',
+      colnames = c("Kabupaten","Kecamatan","NIP","Nama","Tanggal",
+                 "Latitude 1","Longitude 1", "Latitude 2", "Longitude 2","Keterangan")
+    )
+  })
+  
+  output$vb_ket_presensi <- renderUI({
+    vb_data = data_map %>%
+      filter(Kecamatan == input$pilih_kecamatan,
+             Nama == input$pilih_pkb,
+             Tanggal == input$pilih_tanggal) 
+    
+    if(vb_data$presensi_cek == "Presensi Sesuai"){
+      icons_vb = "check-circle"
+    } else{
+      icons_vb = "exclamation-octagon"
+    }
+    value_box(
+      title = "Keterangan:",
+      value = vb_data$presensi_cek,
+      showcase = bs_icon(icons_vb)
+    )
+    
+  })
 
+  output$leaflet_map <- renderLeaflet({
+    data_map = data_map %>%
+      filter(Kecamatan == input$pilih_kecamatan,
+             Nama == input$pilih_pkb,
+             Tanggal == input$pilih_tanggal)
+    
+    data_map$lat1 <- as.numeric(data_map$lat1)
+    data_map$lat2 <- as.numeric(data_map$lat2)
+    data_map$lon1 <- as.numeric(data_map$lon1)
+    data_map$lon2 <- as.numeric(data_map$lon2)
+    
+    ###
+    kantor_opd <- data.frame(
+      Kab = c("PASANGKAYU", "MAMUJU TENGAH", "MAMUJU", 
+              "MAJENE", "POLEWALI MANDAR", "MAMASA"),
+      Nama = c("OPD KB Pasangkayu", "OPD KB MATENG", "OPD KB MAMUJU", 
+               "OPD KB MAJENE", "OPD KB POLMAN", "OPD KB Mamasa"),
+      Lat = as.numeric(c(-1.1746695, -2.0615864, -2.6780518, 
+                         -3.5421326, -3.4174718, -2.9458679)),
+      Long = as.numeric(c(119.3759606, 119.2865281, 118.8911821, 
+                          118.9849558, 119.319912, 119.3700759))
+    )
+    
+    # Fungsi untuk membuat leaflet map
+    create_leaflet_map <- function(presensi_data, index) {
+      # Memeriksa apakah index valid
+      if (index > nrow(presensi_data) || index < 1) {
+        stop("Index out of bounds.")
+      }
+      
+      # Menyaring data berdasarkan index
+      selected_row <- presensi_data[index, ]
+      
+      titik_kantor_opd = kantor_opd %>%
+        filter(Kab == selected_row$Kabupaten)
+      
+      batas_kec = batas_kec_sulbar %>%
+        filter(Kecamatan == selected_row$Kecamatan)
+      # Membuat leaflet map
+      leaflet(batas_kec) %>%
+        addTiles() %>%
+        addPolygons(
+          label = ~Kecamatan
+        ) %>%
+        addMarkers(lng = selected_row$lon1, lat = selected_row$lat1, popup = "Awal", label = "Awal") %>%
+        addMarkers(lng = selected_row$lon2, lat = selected_row$lat2, popup = "Akhir", label = "Akhir") %>%
+        addCircles(lng = titik_kantor_opd$Long, lat = titik_kantor_opd$Lat, radius = 1000, color = "red", fillColor = "red", fillOpacity = 0.2) %>%
+        setView(lng = (selected_row$lon1 + selected_row$lon2) / 2, lat = (selected_row$lat1 + selected_row$lat2) / 2, zoom = 12)
+    }
+    
+    # Contoh pemanggilan fungsi
+    create_leaflet_map(data_map, 1)
+  })
 }
 
 # Run the application 

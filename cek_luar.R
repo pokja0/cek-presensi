@@ -12,7 +12,17 @@ presensi$lat2 <- as.numeric(presensi$lat2)
 presensi$lon1 <- as.numeric(presensi$lon1)
 presensi$lon2 <- as.numeric(presensi$lon2)
 
-presensi$presensi_cek[nrow(presensi)]
+presensi$presensi_cek= 1:nrow(presensi)
+
+###
+kantor_opd <- data.frame(
+  Nama = c("OPD KB Pasangkayu", "OPD KB MATENG", "OPD KB MAMUJU", 
+           "OPD KB MAJENE", "OPD KB POLMAN", "OPD KB Mamasa"),
+  Lat = as.numeric(c(-1.1746695, -2.0615864, -2.6780518, 
+                     -3.5421326, -3.4174718, -2.9458679)),
+  Long = as.numeric(c(119.3759606, 119.2865281, 118.8911821, 
+                      118.9849558, 119.319912, 119.3700759))
+)
 
 ####
 for (i in 1:nrow(presensi)) {
