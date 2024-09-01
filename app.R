@@ -291,7 +291,7 @@ server <- function(input, output, session) {
   
   # Render table untuk data yang diunggah
   output$table <- DT::renderDataTable({
-    withProgress(message = 'Kudu Sabar', value = 0, {
+    withProgress(message = 'Sabar ki', value = 0, {
       data_presensi = data_presensi()
       
       incProgress(1/2, detail = paste("Import Data"))
@@ -430,7 +430,7 @@ server <- function(input, output, session) {
   })
 
   output$leaflet_map <- renderLeaflet({
-    withProgress(message = 'Kudu Sabar', value = 0, {
+    withProgress(message = 'Sabar ki', value = 0, {
     incProgress(1/4, detail = paste("Import Data"))
     data_map = data_map %>%
       filter(Kecamatan == input$pilih_kecamatan,
