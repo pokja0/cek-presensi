@@ -91,7 +91,28 @@ ui <- page_navbar(
                           choices = month.name[8], 
                           selected = "August"),
               selectInput("pilih_tanggal", "Pilih Tanggal", choices = NULL),
+              input_task_button(label_busy = "Sedang Proses",
+                                id = "cari_peta",
+                                label = "Cari"
+              )
             ), #sidebar
+            layout_column_wrap(
+              value_box(
+                title = "Jumlah Hari Kerja:",
+                value = textOutput("jumlah_hari"),
+                showcase = bs_icon("calendar-check")
+              ),
+              value_box(
+                title = "Presensi Sesuai:",
+                value = textOutput("sesuai"),
+                showcase = bs_icon("check-circle")
+              ),
+              value_box(
+                title = "Presensi Tidak Sesuai:",
+                value = textOutput("tidak_sesuai"),
+                showcase = bs_icon("exclamation-octagon")
+              )
+            ),
             uiOutput("vb_ket_presensi"),
             leafletOutput("leaflet_map"),
             fluidRow(verbatimTextOutput("map_marker_click"))
@@ -381,7 +402,9 @@ server <- function(input, output, session) {
   
   #Map
   
-  data_map <- readxl::read_excel("hasil/cek_presensi_agustus_full.xlsx")
+  data_map <- data.table::fread("hasil/cek_presensi_full.csv")
+  data_map <- data_map %>%
+    select(-(V1))
   batas_kec_sulbar <- readRDS("data/batas_kec_sulbar.rds")
   batas_kec_sulbar <- batas_kec_sulbar %>%
     mutate(Kab_Kota = if_else(Kab_Kota == "MAMUJU UTARA", "PASANGKAYU", Kab_Kota),
@@ -404,15 +427,41 @@ server <- function(input, output, session) {
   })
   
   output$table_map <- DT::renderDataTable({
-    data_map = data_map %>%
-      select(-X1)
+    data_map = data_map 
     
     DT::datatable(
       data_map, 
       filter = 'top',
-      colnames = c("Kabupaten","Kecamatan","NIP","Nama","Tanggal",
-                 "Latitude 1","Longitude 1", "Latitude 2", "Longitude 2","Keterangan")
+      colnames = c("Kabupaten","Kecamatan","NIP",
+                   "Nama","Tanggal",
+                   "Latitude 1","Longitude 1", 
+                   "Latitude 2", "Longitude 2","Keterangan")
     )
+  })
+  
+  data_peta_presensi <- eventReactive(input$cari_peta, {
+    Kecamatan1 = input$pilih_kecamatan
+    Nama1 = input$pilih_pkb
+    Bulan1 = input$month_map
+    
+    
+    vb_data = data_map %>%
+      filter(Kecamatan == Kecamatan1,
+             Nama == Nama1) %>%
+      mutate(Bulan = format(as.Date(Tanggal, format = "%d-%m-%Y"), "%B")) %>%
+      filter(Bulan == Bulan1)
+  })
+  
+  output$jumlah_hari <- renderText({
+    jumlah_hari <- nrow(data_peta_presensi())
+  })
+  
+  output$sesuai <- renderText({
+    sesuai <- sum(data_peta_presensi()$presensi_cek == "Presensi Sesuai")
+  })
+  
+  output$tidak_sesuai <- renderText({
+    tidak_sesuai <- sum(data_peta_presensi()$presensi_cek == "Presensi Tidak Sesuai")
   })
   
   output$vb_ket_presensi <- renderUI({
@@ -438,94 +487,94 @@ server <- function(input, output, session) {
     
   })
 
-  output$leaflet_map <- renderLeaflet({
-    withProgress(message = 'Sabar ki', value = 0, {
-    incProgress(1/4, detail = paste("Import Data"))
-    data_map = data_map %>%
-      filter(Kecamatan == input$pilih_kecamatan,
-             Nama == input$pilih_pkb,
-             Tanggal == input$pilih_tanggal)
-
-    
-    data_map$lat1 <- as.numeric(data_map$lat1)
-    data_map$lat2 <- as.numeric(data_map$lat2)
-    data_map$lon1 <- as.numeric(data_map$lon1)
-    data_map$lon2 <- as.numeric(data_map$lon2)
-
-    ###
-    incProgress(2/4, detail = paste("Membuat Peta"))
-    kantor_opd <- data.frame(
-      Kab = c("PASANGKAYU", "MAMUJU TENGAH", "MAMUJU", 
-              "MAJENE", "POLEWALI MANDAR", "MAMASA"),
-      Nama = c("OPD KB Pasangkayu", "OPD KB MATENG", "OPD KB MAMUJU", 
-               "OPD KB MAJENE", "OPD KB POLMAN", "OPD KB Mamasa"),
-      Lat = as.numeric(c(-1.1746695, -2.0615864, -2.6780518, 
-                         -3.5421326, -3.4174718, -2.9458679)),
-      Long = as.numeric(c(119.3759606, 119.2865281, 118.8911821, 
-                          118.9849558, 119.319912, 119.3700759))
-    )
-
-    # Fungsi untuk membuat leaflet map
-    create_leaflet_map <- function(presensi_data, index) {
-      # Memeriksa apakah index valid
-      if (index > nrow(presensi_data) || index < 1) {
-        stop("Tunggu yaa..")
-      }
-      
-      # Menyaring data berdasarkan index
-      selected_row <- presensi_data[index, ]
-      
-      titik_kantor_opd = kantor_opd %>%
-        filter(Kab == selected_row$Kabupaten)
-      
-      batas_kec = batas_kec_sulbar %>%
-        filter(Kecamatan == selected_row$Kecamatan)
-      
-      
-      # Gunakan reverse_geocode untuk mengambil alamat
-      hasil = tibble(
-        latitude = c(selected_row$lat1, selected_row$lat2),
-        longitude = c(selected_row$lon1, selected_row$lon2)
-      ) %>%
-        reverse_geocode(
-          lat = latitude,
-          long = longitude,
-          method = "osm",
-          address = address_found,
-          full_results = TRUE
-        )
-      
-      # Membuat leaflet map
-      leaflet(batas_kec) %>%
-        addTiles() %>%
-        addPolygons() %>%
-        addMarkers(lng = selected_row$lon1, lat = selected_row$lat1, 
-                   popup = paste(hasil$address_found[1], hasil$road[1], hasil$village[1], 
-                                 hasil$municipality[1], sep = " | "), 
-                   label = "Awal") %>%
-        addMarkers(lng = selected_row$lon2, lat = selected_row$lat2, 
-                   popup = paste(hasil$address_found[2], hasil$road[1],
-                                 hasil$village[2], hasil$municipality[2], sep = " | "),
-                   label = "Akhir") %>%
-        addCircles(lng = titik_kantor_opd$Long, lat = titik_kantor_opd$Lat, radius = 1000, 
-                   color = "red", fillColor = "red", fillOpacity = 0.2) %>%
-        setView(lng = (selected_row$lon1 + selected_row$lon2) / 2, 
-                lat = (selected_row$lat1 + selected_row$lat2) / 2, zoom = 12)
-    }
-
-    # Contoh pemanggilan fungsi
-    incProgress(3/4, detail = paste("Sedikit lagi"))
-    peta_presensi = create_leaflet_map(data_map, 1)
-    incProgress(4/4, detail = paste("Selesai"))
-    
-    peta_presensi
-    })
-  })
-  
-  observeEvent(input$mymap_marker_click, { 
-    p <- input$mymap_marker_click  # typo was on this line
-    print(p)
-  })
+  # output$leaflet_map <- renderLeaflet({
+  #   withProgress(message = 'Sabar ki', value = 0, {
+  #   incProgress(1/4, detail = paste("Import Data"))
+  #   data_map = data_map %>%
+  #     filter(Kecamatan == input$pilih_kecamatan,
+  #            Nama == input$pilih_pkb,
+  #            Tanggal == input$pilih_tanggal)
+  # 
+  #   
+  #   data_map$lat1 <- as.numeric(data_map$lat1)
+  #   data_map$lat2 <- as.numeric(data_map$lat2)
+  #   data_map$lon1 <- as.numeric(data_map$lon1)
+  #   data_map$lon2 <- as.numeric(data_map$lon2)
+  # 
+  #   ###
+  #   incProgress(2/4, detail = paste("Membuat Peta"))
+  #   kantor_opd <- data.frame(
+  #     Kab = c("PASANGKAYU", "MAMUJU TENGAH", "MAMUJU", 
+  #             "MAJENE", "POLEWALI MANDAR", "MAMASA"),
+  #     Nama = c("OPD KB Pasangkayu", "OPD KB MATENG", "OPD KB MAMUJU", 
+  #              "OPD KB MAJENE", "OPD KB POLMAN", "OPD KB Mamasa"),
+  #     Lat = as.numeric(c(-1.1746695, -2.0615864, -2.6780518, 
+  #                        -3.5421326, -3.4174718, -2.9458679)),
+  #     Long = as.numeric(c(119.3759606, 119.2865281, 118.8911821, 
+  #                         118.9849558, 119.319912, 119.3700759))
+  #   )
+  # 
+  #   # Fungsi untuk membuat leaflet map
+  #   create_leaflet_map <- function(presensi_data, index) {
+  #     # Memeriksa apakah index valid
+  #     if (index > nrow(presensi_data) || index < 1) {
+  #       stop("Tunggu yaa..")
+  #     }
+  #     
+  #     # Menyaring data berdasarkan index
+  #     selected_row <- presensi_data[index, ]
+  #     
+  #     titik_kantor_opd = kantor_opd %>%
+  #       filter(Kab == selected_row$Kabupaten)
+  #     
+  #     batas_kec = batas_kec_sulbar %>%
+  #       filter(Kecamatan == selected_row$Kecamatan)
+  #     
+  #     
+  #     # Gunakan reverse_geocode untuk mengambil alamat
+  #     hasil = tibble(
+  #       latitude = c(selected_row$lat1, selected_row$lat2),
+  #       longitude = c(selected_row$lon1, selected_row$lon2)
+  #     ) %>%
+  #       reverse_geocode(
+  #         lat = latitude,
+  #         long = longitude,
+  #         method = "osm",
+  #         address = address_found,
+  #         full_results = TRUE
+  #       )
+  #     
+  #     # Membuat leaflet map
+  #     leaflet(batas_kec) %>%
+  #       addTiles() %>%
+  #       addPolygons() %>%
+  #       addMarkers(lng = selected_row$lon1, lat = selected_row$lat1, 
+  #                  popup = paste(hasil$address_found[1], hasil$road[1], hasil$village[1], 
+  #                                hasil$municipality[1], sep = " | "), 
+  #                  label = "Awal") %>%
+  #       addMarkers(lng = selected_row$lon2, lat = selected_row$lat2, 
+  #                  popup = paste(hasil$address_found[2], hasil$road[1],
+  #                                hasil$village[2], hasil$municipality[2], sep = " | "),
+  #                  label = "Akhir") %>%
+  #       addCircles(lng = titik_kantor_opd$Long, lat = titik_kantor_opd$Lat, radius = 1000, 
+  #                  color = "red", fillColor = "red", fillOpacity = 0.2) %>%
+  #       setView(lng = (selected_row$lon1 + selected_row$lon2) / 2, 
+  #               lat = (selected_row$lat1 + selected_row$lat2) / 2, zoom = 12)
+  #   }
+  # 
+  #   # Contoh pemanggilan fungsi
+  #   incProgress(3/4, detail = paste("Sedikit lagi"))
+  #   peta_presensi = create_leaflet_map(data_map, 1)
+  #   incProgress(4/4, detail = paste("Selesai"))
+  #   
+  #   peta_presensi 
+  #   })
+  # })
+  # 
+  # observeEvent(input$mymap_marker_click, { 
+  #   p <- input$mymap_marker_click  # typo was on this line
+  #   print(p)
+  # })
   
 }
 
