@@ -94,6 +94,7 @@ ui <- page_navbar(
             navs_pill(
               nav_panel(
                 "Tabel",
+                br(),
                 layout_column_wrap(
                   value_box(
                     title = "Jumlah Hari Kerja:",
@@ -111,11 +112,12 @@ ui <- page_navbar(
                     showcase = bs_icon("exclamation-octagon")
                   )
                 ),
-                DTOutput("tabel_peta"),
-                fluidRow(verbatimTextOutput("map_marker_click"))
+                DTOutput("tabel_peta")
               ),
               nav_panel(
                 "Peta",
+                br(),
+                uiOutput("vb_ket_presensi"),
                 leafletOutput("leaflet_map")
               )
             )
@@ -441,7 +443,9 @@ server <- function(input, output, session) {
   
   output$table_map <- DT::renderDataTable({
     data_map = data_map 
-    
+    colnames(data_map) <- c("Kabupaten","Kecamatan","NIP", "Nama",
+                                      "Tanggal" , "Lat1" ,"Long1", "Lat2"   ,"Long2",
+                                      "Keterangan")
     DT::datatable(
       data_map, 
       filter = 'top'
@@ -476,10 +480,36 @@ server <- function(input, output, session) {
   output$tabel_peta <- renderDataTable({
     # data <- data %>%
     #   mutate(bulan_angka = month(as.Date(tanggal, format = "%d-%m-%Y")),
-    data_peta_presensi()
+    data_peta_presensi <- data_peta_presensi()
+    colnames(data_peta_presensi) <- c("Kabupaten","Kecamatan","NIP", "Nama",
+                                      "Tanggal" , "Lat1" ,"Long1", "Lat2"   ,"Long2",
+                                      "Keterangan", "Bulan")
+    data_peta_presensi
   })
   
-
+  output$vb_ket_presensi <- renderUI({
+    Kecamatan1 = input$pilih_kecamatan
+    Nama1 = input$pilih_pkb
+    Tanggal1 = input$pilih_tanggal
+    
+    vb_data = data_map %>%
+      filter(Kecamatan == Kecamatan1,
+             Nama == Nama1,
+             Tanggal == Tanggal1) 
+    
+    if(vb_data$presensi_cek == "Presensi Sesuai"){
+      icons_vb = "check-circle"
+    } else{
+      icons_vb = "exclamation-octagon"
+    }
+    value_box(
+      title = "Keterangan:",
+      value = vb_data$presensi_cek,
+      showcase = bs_icon(icons_vb)
+    )
+    
+  })
+  
   peta_presensi <- reactive({
     withProgress(message = 'Sabar ki', value = 0, {
     incProgress(1/4, detail = paste("Import Data"))
