@@ -13,9 +13,6 @@ library(bsicons)
 library(shinymanager)
 library(stringr)
 library(tidygeocoder)
-library(future)
-library(promises)
-future::plan(multisession)
 # Define UI
 data_map <- readxl::read_excel("hasil/cek_presensi_agustus_full.xlsx")
 
