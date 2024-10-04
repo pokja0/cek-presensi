@@ -8,7 +8,7 @@ batas_kec_sulbar <- readRDS("data/batas_kec_sulbar.rds")
 batas_kec_sulbar <- batas_kec_sulbar %>%
   mutate(Kab_Kota = if_else(Kab_Kota == "MAMUJU UTARA", "PASANGKAYU", Kab_Kota),
          Kecamatan = if_else(Kecamatan == "SIMBORO DAN KEPULAUAN", "SIMBORO", Kecamatan))
-presensi <- readxl::read_excel("hasil/scrap_sep_presensi.xlsx")
+presensi <- readxl::read_excel("/home/hi/Documents/projects/Scraping Profil Desa/hasil/oktober_presensi.xlsx")
 presensi$lat1 <- as.numeric(presensi$lat1)
 presensi$lat2 <- as.numeric(presensi$lat2)
 presensi$lon1 <- as.numeric(presensi$lon1)
@@ -111,4 +111,4 @@ for (i in 1:nrow(presensi)) {
 }
 
 
-write.xlsx(presensi, "hasil/cek_presensi_asept_full.xlsx")
+write.xlsx(presensi, "hasil/cek_presensi_oktober_full.xlsx")
