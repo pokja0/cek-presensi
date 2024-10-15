@@ -85,13 +85,13 @@ ui <- page_navbar(
               selectInput("month_map", "Pilih Bulan", 
                           choices = month.name[1:10], 
                           selected = "October"),
-              selectInput("pilih_tanggal", "Pilih Tanggal", choices = NULL),
+              selectInput("pilih_tanggal", "Pilih Tanggal Peta", choices = NULL),
               input_task_button(label_busy = "Sedang Proses",
                                 id = "cari_peta",
                                 label = "Cari"
               )
             ), #sidebar
-            navs_pill(
+            navset_pill(
               nav_panel(
                 "Tabel",
                 br(),
