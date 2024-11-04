@@ -15,6 +15,12 @@ library(stringr)
 library(tidygeocoder)
 # Define UI
 data_map <- readxl::read_excel("hasil/cek_presensi_agustus_full.xlsx")
+tanggal_awal <- c("01-10-2024", "02-10-2024", "03-10-2024", "04-10-2024", "05-10-2024",
+                  "06-10-2024", "07-10-2024", "08-10-2024", "09-10-2024", "10-10-2024",
+                  "11-10-2024", "12-10-2024", "13-10-2024", "14-10-2024", "15-10-2024",
+                  "16-10-2024","17-10-2024", "18-10-2024", "19-10-2024", "20-10-2024",
+                  "21-10-2024", "22-10-2024", "23-10-2024", "24-10-2024", "25-10-2024", "26-10-2024",
+                  "27-10-2024", "28-10-2024", "29-10-2024", "30-10-2024", "31-10-2024")
 
 # define some basic credentials (on data.frame)
 credentials <- data.frame(
@@ -84,7 +90,7 @@ ui <- page_navbar(
               selectInput("pilih_pkb", "Pilih PKB/PLKB", choices = NULL),
               selectInput("month_map", "Pilih Bulan", 
                           choices = month.name[1:10], 
-                          selected = "October"),
+                          selected = "January"),
               selectInput("pilih_tanggal", "Pilih Tanggal Peta", choices = NULL),
               input_task_button(label_busy = "Sedang Proses",
                                 id = "cari_peta",
@@ -425,7 +431,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, "pilih_pkb", choices = unique(pkb_name$Nama))
   })
   
-  observeEvent(input$pilih_pkb, {
+  observeEvent(input$month_map, {
     # Menentukan pilihan baru untuk selectInput kedua berdasarkan kategori yang dipilih
     Kecamatan1 = input$pilih_kecamatan
     Nama1 = input$pilih_pkb
