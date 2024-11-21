@@ -89,7 +89,7 @@ ui <- page_navbar(
               selectInput("pilih_kecamatan", "Pilih Kecamatan", choices = unique(data_map$Kecamatan)),
               selectInput("pilih_pkb", "Pilih PKB/PLKB", choices = NULL),
               selectInput("month_map", "Pilih Bulan", 
-                          choices = month.name[1:10], 
+                          choices = month.name[1:11], 
                           selected = "January"),
               selectInput("pilih_tanggal", "Pilih Tanggal Peta", choices = NULL),
               input_task_button(label_busy = "Sedang Proses",
