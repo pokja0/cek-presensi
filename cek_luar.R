@@ -3,10 +3,10 @@ library(leaflet)
 library(dplyr)
 library(openxlsx)
 
-batas_kec_sulbar <- readRDS("data/batas_kec_sulbar.rds")
+batas_kec_sulbar <- readRDS("/home/hi/Documents/projects/cek-presensi/data/batas_kec_sulbar.rds")
 batas_kec_sulbar <- batas_kec_sulbar %>%
   mutate(Kab_Kota = if_else(Kab_Kota == "MAMUJU UTARA", "PASANGKAYU", Kab_Kota))
-presensi <- read.xlsx("data/agustus_presensi.xlsx")
+presensi <- read.xlsx("/home/hi/Documents/projects/Scraping Profil Desa/hasil/scrap_nov_presensi.xlsx")
 presensi$lat1 <- as.numeric(presensi$lat1)
 presensi$lat2 <- as.numeric(presensi$lat2)
 presensi$lon1 <- as.numeric(presensi$lon1)
@@ -57,7 +57,7 @@ for (i in 1:nrow(presensi)) {
 }
 
 
-write.xlsx(presensi, "cek_presensi_agustus.xlsx")
+write.xlsx(presensi, "/home/hi/Documents/projects/cek-presensi/hasil/cek_presensi_nov.xlsx")
 #########
 presensi$cek[1] = 2 
 
