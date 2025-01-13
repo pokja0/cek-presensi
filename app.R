@@ -27,7 +27,7 @@ credentials <- data.frame(
   user = c("1", "admin.sulbar"), # mandatory
   password = c("1", "666803"), # mandatory
   start = c("2019-04-15"), # optinal (all others)
-  expire = c(NA, "2024-12-31"),
+  expire = c(NA, "2025-12-31"),
   admin = c(FALSE, TRUE),
   comment = "Simple and secure authentification mechanism 
   for single ‘Shiny’ applications.",
